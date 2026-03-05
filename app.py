@@ -1,3 +1,4 @@
+
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -40,44 +41,49 @@ def validate_ticker(ticker):
     return bool(re.match(pattern, ticker_clean))
 
 # Período de dados expandido até 5 anos
+# ✅ Padrão ajustado para 1y (índice 3) - ideal para iniciantes
 periodo = st.sidebar.selectbox(
     "📅 Período de Dados", 
     options=["1mo", "3mo", "6mo", "1y", "2y", "5y"],
-    index=4,
+    index=3,
     help="Períodos maiores fornecem mais contexto histórico para análise"
 )
 
 # Capital com limites e validação
+# ✅ Padrão ajustado para R$ 1.000 - ideal para iniciantes
 capital = st.sidebar.number_input(
     "💰 Capital Disponível (R$)", 
     min_value=100.0,
     max_value=10000.0,
-    value=10000.0,
-    step=100.0,
+    value=1000.0,
+    step=50.0,
     format="%.2f",
     help="Valor entre R$ 100 e R$ 10.000 para cálculo de posição"
 )
 
 # Risco por operação com slider mais preciso
+# ✅ Padrão ajustado para 1.0% - conservador para iniciantes
 risco_por_operacao = st.sidebar.slider(
     "⚠️ Risco por Operação (%)", 
     min_value=0.5,
     max_value=5.0,
-    value=2.0,
+    value=1.0,
     step=0.5,
     help="Porcentagem do capital que você aceita perder se o stop-loss for acionado"
 )
 
 # Configurações avançadas (opcional)
 with st.sidebar.expander("🔧 Configurações Avançadas", expanded=False):
+    # ✅ Padrão ajustado para 2.5 - stop nem muito apertado, nem muito folgado
     atr_multiplier = st.slider(
         "🎯 Multiplicador ATR para Stop-Loss",
         min_value=1.0,
         max_value=4.0,
-        value=2.0,
+        value=2.5,
         step=0.5,
         help="Fator multiplicador do ATR para calcular distância do stop-loss"
     )
+    # ✅ Padrão já estava em 3.0 (índice 3) - relação risco/retorno favorável
     risk_reward_ratio = st.selectbox(
         "📊 Relação Risco/Retorno Alvo",
         options=[1.5, 2.0, 2.5, 3.0, 4.0],
@@ -166,10 +172,13 @@ def generate_signal(df, capital, risk_pct, atr_mult=2.0, rr_ratio=3.0):
     position_value = 0.0
     
     # --- Lógica de Compra (Swing Trade) ---
+    # ✅ CORREÇÃO: Comparação segura da EMA21 (evita erro com .shift() em valor escalar)
+    ema21_rising = df['EMA21'].iloc[-1] > df['EMA21'].iloc[-2]
+    
     trend_ok = (
         last['Close'] > last['EMA21'] and 
         last['EMA21'] > last['EMA50'] and
-        last['EMA21'] > last['EMA21'].shift(1)
+        ema21_rising
     )
     
     rsi_ok = 40 < last['RSI'] < 70
